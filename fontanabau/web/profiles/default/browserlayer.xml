@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<layers>
+
+    <layer name="fontanabau.web"
+           interface="fontanabau.web.interfaces.IFontanabauWebLayer" />
+
+</layers>
