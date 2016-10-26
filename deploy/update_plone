@@ -1,18 +1,22 @@
 #!/usr/bin/env python
 
+import ConfigParser
 import json
+import logging
 import os
 import re
 import shlex
 import subprocess
 import sys
 
-CHANGED_FILES = []
 
+CHANGED_FILES = []
 SITES = []
+LOG = logging.getLogger('update_plone')
 
 
 def update_plone(oldrev, newrev):
+    zero_downtime = is_zero_downtime_configured()
     print 'UPDATE PLONE'
     print '${0} -> ${1}'.format(oldrev, newrev)
 
@@ -25,30 +29,42 @@ def update_plone(oldrev, newrev):
     print ''
 
     buildout_required = has_changed(r'^.*\.cfg$') or has_changed(r'setup.py')
-    templates_changed = has_changed(r'\.pt$')
     print 'buildout required:', bool(buildout_required)
-    print 'templates changed:', bool(templates_changed)
+    print 'zero downtime:', zero_downtime
     sys.stdout.flush()
 
-    if supervisor_status()['instance0'] != 'STOPPED':
-        run_fg('bin/supervisorctl stop instance0')
-
-    assure_maintenance_server_running()
-
-    if templates_changed:
-        stop_instances()
+    maybe_start('maintenance')
+    maybe_stop('instance0')
+    maybe_stop('instancepub')
 
     if buildout_required:
         run_buildout()
+        run_fg('bin/supervisorctl reread')
 
-    run_fg('bin/supervisorctl start instance0')
-    if has_proposed_upgrades():
-        stop_instances()
-        run_upgrades()
-        start_instances()
+    maybe_restart('solr')
+    maybe_restart('tika-server')
+    maybe_restart('redis')
+
+    maybe_start('instance0')
+    proposed_upgrades = has_proposed_upgrades()
+    plone_upgrades = plone_upgrade_needed()
+    if proposed_upgrades or plone_upgrades:
+        if not zero_downtime:
+            stop_load_balanced_instances()
+
+        if plone_upgrades:
+            run_plone_upgrades()
+        if proposed_upgrades:
+            run_upgrades()
+
+        restart_load_balanced_instances()
     else:
-        restart_instances()
+        restart_load_balanced_instances()
+
+    update_supervisor_config()
     recook_resources()
+    maybe_start('instancepub')
+    maybe_stop('instance0')
 
 
 def run_bg(cmd, cwd=None):
@@ -70,6 +86,7 @@ def run_bg(cmd, cwd=None):
 
 
 def run_fg(cmd, abort_on_error=True):
+    LOG.info('> {0}'.format(cmd))
     print ''
     print '>', cmd
     sys.stdout.flush()
@@ -100,6 +117,7 @@ def update_sources():
                 run_bg('git diff {0} {1} --name-only'.format(oldrev, newrev),
                        cwd=path).strip().splitlines()))
         print path, oldrev, '=>', newrev
+        LOG.info('pulling {0}: {1} => {2}'.format(path, oldrev, newrev))
 
 
 def assure_supervisord_running():
@@ -113,46 +131,55 @@ def assure_supervisord_running():
         run_fg('bin/supervisord')
 
 
-def assure_maintenance_server_running():
-    status = supervisor_status()
-    if 'maintenance' in status and status['maintenance'] != 'RUNNING':
-        run_fg('bin/supervisorctl start maintenance')
-
-
 def supervisor_status():
     assure_supervisord_running()
     return dict(map(lambda line: line.split()[:2],
                     run_bg('bin/supervisorctl status').strip().splitlines()))
 
 
-def instances():
+def load_balanced_instances():
+    whitelist = (
+        'instance1', 'instance2', 'instance3', 'instance4', 'instance5',
+        'instance6', 'instance7', 'instance8', 'instance9')
+
     for name, status in supervisor_status().items():
-        if not name.startswith('instance'):
-            continue
-
-        yield name, status
+        if name in whitelist:
+            yield name, status
 
 
-def stop_instances():
-    names = [name for (name, status) in instances()
+def stop_load_balanced_instances():
+    names = [name for (name, status) in load_balanced_instances()
              if status != 'STOPPED' and name != 'instance0']
     run_fg('bin/supervisorctl stop {0}'.format(' '.join(names)))
 
 
-def start_instances():
-    names = [name for (name, status) in instances()
-             if status != 'RUNNING' and name != 'instance0']
-    run_fg('bin/supervisorctl start {0}'.format(' '.join(names)))
-
-
-def restart_instances():
-    for instance_name, status in instances():
+def restart_load_balanced_instances():
+    for instance_name, status in load_balanced_instances():
         if instance_name == 'instance0':
             continue
 
         if status != 'STOPPED':
             run_fg('bin/supervisorctl stop {0}'.format(instance_name))
+        run_fg('bin/supervisorctl update {0}'.format(instance_name))
         run_fg('bin/supervisorctl start {0}'.format(instance_name))
+
+
+def maybe_stop(name):
+    status = supervisor_status()
+    if name in status and status[name] != 'STOPPED':
+        run_fg('bin/supervisorctl stop {0}'.format(name))
+
+
+def maybe_start(name):
+    status = supervisor_status()
+    if name in status and status[name] != 'RUNNING':
+        run_fg('bin/supervisorctl update {0}'.format(name))
+        run_fg('bin/supervisorctl start {0}'.format(name))
+
+
+def maybe_restart(name):
+    maybe_stop(name)
+    maybe_start(name)
 
 
 def run_buildout():
@@ -179,9 +206,80 @@ def has_proposed_upgrades():
     return False
 
 
+def plone_upgrade_needed():
+    for site in get_sites():
+        command = './bin/upgrade plone_upgrade_needed -s %s' % site['path']
+        if json.loads(run_bg(command)):
+            print 'Plone upgrade needed.'
+            sys.stdout.flush()
+            return True
+
+    return False
+
+
+def run_plone_upgrades():
+    print 'Running Plone upgrades:'
+    for site in get_sites():
+        run_fg('bin/upgrade plone_upgrade -s %s' % site['path'])
+    return True
+
+
 def recook_resources():
     for site in get_sites():
         run_fg('bin/upgrade recook -s %s' % site['path'])
+
+
+def update_supervisor_config():
+    """
+    "./bin/supervisorctl reread" has output when the supervisor configuration
+    has changed, e.g.:
+    $ ./bin/supervisorctl reread
+    instance1: changed
+    redis: available
+
+    For updating the supervisor daemon with the new settings, use the "update"
+    action:
+    $ ./bin/supervisorctl update instance1
+    instance1: stopped
+    instance1: updated process group
+
+    As this does restart the programs, we do not want to do it for all programs
+    (not for zeo, for example) and we do not want to stop all programs at once.
+    We also do it at the end of the update as we might already have updated
+    programs earlier when restarting them.
+    """
+
+    blacklist = (
+        # Do not restart "zeo" automatically as it may result in
+        # an unexpected downtime.
+        'zeo',
+    )
+
+    print ''
+    print ''
+    print ''
+    updates = run_bg('bin/supervisorctl reread')
+    print 'Supervisor configuration reread: ', updates
+    LOG.info('Supervisor configuration reread: {0}'.format(updates))
+
+    if ':' not in updates:
+        # No config updates to processes
+        return
+
+    for line in updates.strip().splitlines():
+        program, state = line.strip().split(': ', 1)
+        if program in blacklist:
+            msg = ('Changes on program "{0}" are not automatically updated'
+                   ' because the program is blacklisted.'
+                   ' Manual action is necessary!').format(program)
+            LOG.warning(msg)
+            print '-' * 30
+            print 'WARNING:', msg
+            print '-' * 30
+            continue
+
+        print 'Updating {0} ({1})'.format(program, state)
+        run_fg('bin/supervisorctl update {0}'.format(program))
 
 
 def get_sites():
@@ -195,5 +293,33 @@ def get_sites():
 
     return SITES
 
+
+def setup_logging():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler('var/log/deploy-plone.log')
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s %(name)s (%(process)s): %(message)s'))
+    logger.addHandler(handler)
+
+
+def is_zero_downtime_configured():
+    # The zero downtime configuration must be in the buildout.cfg (may be a
+    # symlink) but cannot be in an "extends" since those are not followed!
+    parser = ConfigParser.SafeConfigParser()
+    parser.read('buildout.cfg')
+    option = ('buildout', 'deployment-zero-downtime')
+    if not parser.has_option(*option):
+        return False
+    truthy = ('y', 'yes', 't', 'true', 'on', '1')
+    return parser.get(*option).strip().lower() in truthy
+
+
 if __name__ == '__main__':
+    setup_logging()
+    LOG.info('"{0}" invoked by {1}.'.format(
+        ' '.join(sys.argv),
+        os.environ.get('SSH_USER_NAME',
+                       os.environ.get('SSH_USER_EMAIL',
+                                      os.environ.get('USER', 'unknown user')))))
     update_plone(*sys.argv[1:])
