@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2016-03-09 13:59+0000\n"
+"POT-Creation-Date: 2016-10-26 19:03+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -11,20 +11,19 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0\n"
 "Preferred-Encodings: utf-8 latin1\n"
 
-#: ./fontanabau/web/configure.zcml:22
+#: ./fontanabau/web/configure.zcml:23
 msgid "fontanabau.web"
 msgstr ""
 
-#: ./fontanabau/web/configure.zcml:39
+#: ./fontanabau/web/configure.zcml:30
+msgid "fontanabau.web Example-Content"
+msgstr ""
+
+#: ./fontanabau/web/configure.zcml:48
 msgid "fontanabau.web: DEVELOPMENT"
 msgstr ""
 
-#: ./fontanabau/web/profiles/default/actions.xml
-#: ./fontanabau/web/upgrades/20160406135825_enable_edit_mode_switcher/actions.xml
-msgid "Disable edit mode"
+#: ./fontanabau/web/configure.zcml:54
+msgid "fontanabau.web: PRODUCTION"
 msgstr ""
 
-#: ./fontanabau/web/profiles/default/actions.xml
-#: ./fontanabau/web/upgrades/20160406135825_enable_edit_mode_switcher/actions.xml
-msgid "Enable edit mode"
-msgstr ""

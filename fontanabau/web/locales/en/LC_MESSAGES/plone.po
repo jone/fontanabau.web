@@ -15,30 +15,37 @@ msgstr ""
 "Preferred-Encodings: utf-8 latin1\n"
 
 #. Default: "Eingereicht"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "Eingereicht"
 msgstr "Eingereicht"
 
 #. Default: "Entwurf"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "Entwurf"
 msgstr "Entwurf"
 
 #. Default: "Veröffentlicht"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "Veröffentlicht"
 msgstr "Veröffentlicht"
 
 #. Default: "einreichen"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "einreichen"
 msgstr "einreichen"
 
 #. Default: "Internetbenutzer"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "fontanabau_web_workflow--ROLE--Anonymous"
 msgstr "Internetbenutzer"
 
 #. Default: "Autor"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "fontanabau_web_workflow--ROLE--Editor"
 msgstr "Autor"
 
 #. Default: "System Administrator"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "fontanabau_web_workflow--ROLE--Manager"
 msgstr "System Administrator"
 
@@ -47,21 +54,28 @@ msgid "fontanabau_web_workflow--ROLE--Reader"
 msgstr "Gast"
 
 #. Default: "Redaktor"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "fontanabau_web_workflow--ROLE--Reviewer"
 msgstr "Redaktor"
 
-#. Default: "Verwalter"
+#. Default: "Webmaster"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
+#, fuzzy
 msgid "fontanabau_web_workflow--ROLE--Site Administrator"
 msgstr "Verwalter"
 
 #. Default: "veröffentlichen"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "veröffentlichen"
 msgstr "veröffentlichen"
 
 #. Default: "zurückweisen"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "zurückweisen"
 msgstr "zurückweisen"
 
 #. Default: "zurückziehen"
+#: fontanabau/web/profiles/default/workflows/fontanabau_web_workflow/specification.de.txt
 msgid "zurückziehen"
 msgstr "zurückziehen"
+

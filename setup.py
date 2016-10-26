@@ -24,7 +24,6 @@ setup(name='fontanabau.web',
 
       install_requires=[
           'Plone',
-          'collective.editmodeswitcher',
           'ftw.file',
           'ftw.footer',
           'ftw.htmlblock',
